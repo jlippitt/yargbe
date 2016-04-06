@@ -12,6 +12,9 @@ const SAMPLE_PERIOD: f32 = CYCLES_PER_SECOND as f32 / SAMPLE_RATE as f32;
 
 const FRAME_SEQUENCER_THRESHOLD: u64 = 2048;
 
+const MAX_FREQUENCY: u16 = 2047;
+const MAX_PERIOD: u64 = 2048;
+
 pub struct Audio {
     device: AudioDevice<AudioSystemCallback>,
     audio_state: Rc<RefCell<AudioState>>,
@@ -44,6 +47,7 @@ type Frame = u32;
 struct PulseChannel {
     enabled: bool,
     frequency_timer: FrequencyTimer,
+    frequency_sweep: Option<FrequencySweep>,
     duty_cycle: DutyCycle,
     length_counter: LengthCounter,
     envelope: Envelope,
@@ -69,8 +73,18 @@ struct NoiseChannel {
 }
 
 struct FrequencyTimer {
+    frequency: u16,
     period: u64,
     clock: u64
+}
+
+struct FrequencySweep {
+    enabled: bool,
+    frequency: u16,
+    period: u64,
+    clock: u64,
+    shift: u16,
+    negate: bool
 }
 
 struct DutyCycle {
@@ -212,8 +226,8 @@ impl AudioState {
             enabled: false,
             left_volume: 0,
             right_volume: 0,
-            pulse1: PulseChannel::new(),
-            pulse2: PulseChannel::new(),
+            pulse1: PulseChannel::new(Some(FrequencySweep::new())),
+            pulse2: PulseChannel::new(None),
             wave: WaveChannel::new(),
             noise: NoiseChannel::new()
         }
@@ -366,10 +380,11 @@ impl FrameSequencer {
 }
 
 impl PulseChannel {
-    fn new() -> PulseChannel {
+    fn new(frequency_sweep: Option<FrequencySweep>) -> PulseChannel {
         PulseChannel {
             enabled: false,
             frequency_timer: FrequencyTimer::new(),
+            frequency_sweep: frequency_sweep,
             duty_cycle: DutyCycle::new(),
             length_counter: LengthCounter::new(64),
             envelope: Envelope::new(),
@@ -380,8 +395,10 @@ impl PulseChannel {
     fn byte(&self, offset: usize) -> Byte {
         match offset {
             0 => {
-                // TODO: Sweep
-                0
+                match self.frequency_sweep {
+                    Some(ref frequency_sweep) => frequency_sweep.bits(),
+                    None => 0
+                }
             },
             1 => {
                 (self.duty_cycle.bits() << 6) + self.length_counter.bits()
@@ -403,7 +420,9 @@ impl PulseChannel {
     fn put_byte(&mut self, offset: usize, value: Byte) {
         match offset {
             0 => {
-                // TODO: Sweep
+                if let Some(ref mut frequency_sweep) = self.frequency_sweep {
+                    frequency_sweep.set_bits(value);
+                }
             },
             1 => {
                 self.duty_cycle.set_bits((value & 0xC0) >> 6);
@@ -424,6 +443,12 @@ impl PulseChannel {
                     self.frequency_timer.reset();
                     self.length_counter.reset();
                     self.envelope.reset();
+
+                    if let Some(ref mut frequency_sweep) = self.frequency_sweep {
+                        if frequency_sweep.reset(&mut self.frequency_timer) {
+                            self.enabled = false;
+                        }
+                    }
                 }
             },
             _ => unreachable!()
@@ -439,6 +464,12 @@ impl PulseChannel {
     fn on_frame_update(&mut self, frame: Frame) {
         if self.length_counter.on_frame_update(frame) {
             self.enabled = false;
+        }
+
+        if let Some(ref mut frequency_sweep) = self.frequency_sweep {
+            if frequency_sweep.on_frame_update(frame, &mut self.frequency_timer) {
+                self.enabled = false;
+            }
         }
 
         self.envelope.on_frame_update(frame);
@@ -610,25 +641,36 @@ impl NoiseChannel {
 impl FrequencyTimer {
     fn new() -> FrequencyTimer {
         FrequencyTimer {
-            period: 0,
+            frequency: 0,
+            period: MAX_PERIOD,
             clock: 0
         }
     }
 
+    fn frequency(&self) -> u16 {
+        self.frequency
+    }
+
+    fn set_frequency(&mut self, frequency: u16) {
+        self.frequency = frequency;
+    }
+
     fn lower_bits(&self) -> Byte {
-        ((!self.period) & 0x00FF) as Byte
+        (self.frequency & 0x00FF) as Byte
     }
 
     fn set_lower_bits(&mut self, value: Byte) {
-        self.period = (self.period & 0xFF00) + (!value) as u64;
+        self.frequency = (self.frequency & 0x0700) | (value as u16);
+        self.period = MAX_PERIOD - self.frequency as u64
     }
 
     fn upper_bits(&self) -> Byte {
-        (((!self.period) & 0x0700) >> 8) as Byte
+        ((self.frequency & 0x0700) >> 8) as Byte
     }
 
     fn set_upper_bits(&mut self, value: Byte) {
-        self.period = ((((!value) as u64) & 0x07) << 8) + (self.period & 0x00FF);
+        self.frequency = (((value as u16) << 8) & 0x0700) | (self.frequency & 0x00FF);
+        self.period = MAX_PERIOD - self.frequency as u64
     }
 
     fn reset(&mut self) {
@@ -644,6 +686,74 @@ impl FrequencyTimer {
         } else {
             false
         }
+    }
+}
+
+impl FrequencySweep {
+    fn new() -> FrequencySweep {
+        FrequencySweep {
+            enabled: false,
+            frequency: 0,
+            period: 0,
+            clock: 0,
+            shift: 0,
+            negate: false
+        }
+    }
+
+    fn bits(&self) -> Byte {
+        ((self.period as Byte) << 4) + ((self.negate as Byte) << 3) + self.shift as Byte
+    }
+
+    fn set_bits(&mut self, value: Byte) {
+        self.period = ((value & 0x70) >> 4) as u64;
+        self.negate = (value & 0x08) != 0;
+        self.shift = (value & 0x07) as u16;
+    }
+
+    fn reset(&mut self, frequency_timer: &mut FrequencyTimer) -> bool {
+        self.frequency = frequency_timer.frequency();
+        self.clock = 0;
+        self.enabled = self.period != 0 || self.shift != 0;
+
+        if self.enabled {
+            self.sweep(frequency_timer)
+        } else {
+            false
+        }
+    }
+
+    fn on_frame_update(&mut self, frame: Frame, frequency_timer: &mut FrequencyTimer) -> bool {
+        if self.enabled && frame == 7 {
+            self.clock += 1;
+
+            if self.clock >= self.period {
+                self.clock = 0;
+                return self.sweep(frequency_timer)
+            }
+        }
+
+        false
+    }
+    
+    fn sweep(&mut self, frequency_timer: &mut FrequencyTimer) -> bool {
+        let delta = self.frequency >> self.shift;
+
+        if self.negate {
+            self.frequency = self.frequency.wrapping_sub(delta);
+        } else {
+            self.frequency = self.frequency.wrapping_add(delta);
+        };
+
+        let overflow = self.frequency > MAX_FREQUENCY;
+
+        self.frequency &= MAX_FREQUENCY;
+
+        if !overflow {
+            frequency_timer.set_frequency(self.frequency);
+        }
+
+        overflow
     }
 }
 
