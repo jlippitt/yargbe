@@ -19,12 +19,12 @@ pub struct Screen {
 }
 
 impl Screen {
-    pub fn new(video_subsystem: &VideoSubsystem) -> Screen {
+    pub fn new(video_subsystem: &VideoSubsystem, scale: u32) -> Screen {
         let window = video_subsystem
             .window(
                 "YAR-GBE",
-                DISPLAY_WIDTH as u32,
-                DISPLAY_HEIGHT as u32
+                DISPLAY_WIDTH as u32 * scale,
+                DISPLAY_HEIGHT as u32 * scale
             )
             .position_centered()
             .build()

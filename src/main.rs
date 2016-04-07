@@ -1,8 +1,11 @@
 #[macro_use]
 extern crate bitflags;
+
 #[cfg(feature="logging")]
 #[macro_use]
 extern crate log;
+
+extern crate getopts;
 extern crate sdl2;
 extern crate time;
 
@@ -10,6 +13,7 @@ extern crate time;
 mod logger;
 
 mod audio;
+mod config;
 mod cpu;
 mod gpu;
 mod interrupt;
@@ -26,6 +30,7 @@ const FRAME_DELAY: u64 = 1000000000 * gpu::CYCLES_PER_FRAME / cpu::CYCLES_PER_SE
 
 fn main() {
     use audio::{Audio, AudioState};
+    use config::Action;
     use cpu::Cpu;
     use gpu::{CYCLES_PER_FRAME, Gpu, GpuState};
     use interrupt::InterruptState;
@@ -36,7 +41,6 @@ fn main() {
     use sdl2::event::Event;
     use sdl2::keyboard::Keycode;
     use std::cell::RefCell;
-    use std::env;
     use std::path::Path;
     use std::rc::Rc;
     use std::thread;
@@ -45,24 +49,32 @@ fn main() {
 
     let mut log_control = logger::init().unwrap();
 
-    let path = match env::args().nth(1) {
-        Some(path) => path,
-        None => panic!("No ROM path specified")
+    let config = match config::parse() {
+        Action::Run(config) => config,
+        Action::ShowUsage(usage) => {
+            println!("{}", usage);
+            return;
+        },
+        Action::ShowError(err) => {
+            println!("{}", err);
+            println!("Use -h or --help to display usage information.");
+            return;
+        }
     };
+
+    let rom = Rom::new(Path::new(&config.path));
 
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
     let audio_subsystem = sdl_context.audio().unwrap();
+
+    let screen = Screen::new(&video_subsystem, config.scale);
 
     let audio_state = Rc::new(RefCell::new(AudioState::new()));
     let gpu_state = Rc::new(RefCell::new(GpuState::new()));
     let timer_state = Rc::new(RefCell::new(TimerState::new()));
     let joypad_state = Rc::new(RefCell::new(JoypadState::new()));
     let interrupt_state = Rc::new(RefCell::new(InterruptState::new()));
-
-    let screen = Screen::new(&video_subsystem);
-
-    let rom = Rom::new(Path::new(&path));
 
     let mmu = Mmu::new(
         rom,

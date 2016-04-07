@@ -9,7 +9,6 @@ Yet Another Rust Game Boy Emulator
 
 ## Features Still To Come
 
-* Graphical scaling (2X, 4X, etc.)
 * Other cartridge types (and MBC3 real time clock)
 * 'Battery-backed RAM' (i.e. save files on disk)
 * Game Boy Color support (maybe)
@@ -17,6 +16,17 @@ Yet Another Rust Game Boy Emulator
 ## What Probably Won't Be Implemented
 
 * Serial port (as it doesn't seem to make much sense on an emulator)
+
+## Usage
+
+    yargbe [options] /path/to/my_rom.gb
+
+The following options are supported:
+
+| Option          |                                                                                              |
+|-----------------| ---------------------------------------------------------------------------------------------|
+| -s N, --scale N | Upscales the display by a factor of n in each direction. The default is 1 (i.e. no scaling). |
+| -h N, --help N  | Displays usage information.                                                                   |
 
 ## Screenshots
 
