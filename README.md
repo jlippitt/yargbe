@@ -23,10 +23,10 @@ Yet Another Rust Game Boy Emulator
 
 The following options are supported:
 
-| Option          |                                                                                              |
-|-----------------| ---------------------------------------------------------------------------------------------|
-| -s N, --scale N | Upscales the display by a factor of n in each direction. The default is 1 (i.e. no scaling). |
-| -h N, --help N  | Displays usage information.                                                                   |
+| Option        |                                                                                              |
+|---------------| ---------------------------------------------------------------------------------------------|
+| -s, --scale N | Upscales the display by a factor of n in each direction. The default is 1 (i.e. no scaling). |
+| -h, --help    | Displays usage information.                                                                  |
 
 ## Screenshots
 
