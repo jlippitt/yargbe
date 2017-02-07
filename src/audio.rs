@@ -156,7 +156,7 @@ impl Audio {
             samples: None
         };
 
-        let device = audio_subsystem.open_playback(None, &desired_spec, move |spec| {
+        let device = audio_subsystem.open_playback(None, &desired_spec, move |_spec| {
             AudioSystemCallback::new(receiver)
         }).unwrap();
 
