@@ -20,7 +20,15 @@ pub struct Rom {
     ram_offset: usize
 }
 
-enum CartridgeType {
+#[derive(Default)]
+struct CartridgeType {
+    mapper: Mapper,
+    timer_enabled: bool, // Note: Not currently used
+    ram_enabled: bool, // Note: Not currently used
+    save_enabled: bool
+}
+
+enum Mapper {
     RomOnly,
     Mbc1,
     Mbc3
@@ -40,14 +48,9 @@ impl Rom {
             .read_to_end(&mut data)
             .unwrap();
 
-        let cartridge_type = match data[0x0147] {
-            0x00 => CartridgeType::RomOnly,
-            0x01 ... 0x03 => CartridgeType::Mbc1,
-            0x0F ... 0x13 => CartridgeType::Mbc3,
-            value @ _ => panic!("Unsupported cartridge type: {:02X}", value)
-        };
+        let cartridge_type = CartridgeType::from(data[0x0147]);
 
-        debug!("Cartridge Type: {}", cartridge_type);
+        info!("Cartridge Type: {}", cartridge_type);
 
         let rom_bank_count = match data[0x0148] {
             0x00 => 2,
@@ -63,7 +66,7 @@ impl Rom {
             value @ _ => panic!("Unable to determine number of ROM banks: {:02X}", value)
         };
 
-        debug!("ROM size: {} ({} banks)", data.len(), rom_bank_count);
+        info!("ROM size: {} ({} banks)", data.len(), rom_bank_count);
 
         let ram_size: usize = match data[0x0149] {
             0x00 => 0,
@@ -74,7 +77,7 @@ impl Rom {
             value @ _ => panic!("Invalid RAM size byte: {:02X}", value)
         };
 
-        debug!("RAM size: {}", ram_size);
+        info!("RAM size: {}", ram_size);
 
         Rom {
             data: data,
@@ -113,8 +116,8 @@ impl Rom {
                 }
             },
             0x2000 ... 0x3FFF => {
-                match self.cartridge_type {
-                    CartridgeType::Mbc1 => {
+                match self.cartridge_type.mapper {
+                    Mapper::Mbc1 => {
                         let mut low_bank = value & 0x1F;
 
                         // ROM bank $00 acts the same as $01, $20 as $21, etc.
@@ -125,7 +128,7 @@ impl Rom {
                         let rom_bank = (self.rom_bank & 0x60) + low_bank;
                         self.set_rom_bank(rom_bank);
                     },
-                    CartridgeType::Mbc3 => {
+                    Mapper::Mbc3 => {
                         let mut rom_bank = value & 0x7F;
 
                         // ROM bank $00 acts the same as $01 (but $20 is $20)
@@ -139,8 +142,8 @@ impl Rom {
                 }
             },
             0x4000 ... 0x5FFF => {
-                match self.cartridge_type {
-                    CartridgeType::Mbc1 => {
+                match self.cartridge_type.mapper {
+                    Mapper::Mbc1 => {
                         match self.mode {
                             Mode::Rom => {
                                 let rom_bank = ((value << 5) & 0x60) + (self.rom_bank & 0x1F);
@@ -151,7 +154,7 @@ impl Rom {
                             }
                         }
                     },
-                    CartridgeType::Mbc3 => {
+                    Mapper::Mbc3 => {
                         if value <= 0x03 {
                             // RAM bank select
                             self.set_ram_bank(value);
@@ -163,8 +166,8 @@ impl Rom {
                 }
             },
             0x6000 ... 0x7FFF => {
-                match self.cartridge_type {
-                    CartridgeType::Mbc1 => {
+                match self.cartridge_type.mapper {
+                    Mapper::Mbc1 => {
                         self.mode = match value & 0x01 {
                             0x00 => Mode::Rom,
                             0x01 => {
@@ -176,7 +179,7 @@ impl Rom {
                             _ => unreachable!()
                         }
                     },
-                    CartridgeType::Mbc3 => {
+                    Mapper::Mbc3 => {
                         // TODO: Clock
                     },
                     _ => debug!("Mode switch not enabled for this cartridge type")
@@ -227,12 +230,93 @@ impl Rom {
     }
 }
 
+impl From<Byte> for CartridgeType {
+    fn from(value: Byte) -> CartridgeType {
+        match value {
+            0x00 => CartridgeType {
+                mapper: Mapper::RomOnly,
+                ..Default::default()
+            },
+            0x01 => CartridgeType {
+                mapper: Mapper::Mbc1,
+                ..Default::default()
+            },
+            0x02 => CartridgeType {
+                mapper: Mapper::Mbc1,
+                ram_enabled: true,
+                ..Default::default()
+            },
+            0x03 => CartridgeType {
+                mapper: Mapper::Mbc1,
+                ram_enabled: true,
+                save_enabled: true,
+                ..Default::default()
+            },
+            0x0F => CartridgeType {
+                mapper: Mapper::Mbc3,
+                timer_enabled: true,
+                save_enabled: true,
+                ..Default::default()
+            },
+            0x10 => CartridgeType {
+                mapper: Mapper::Mbc3,
+                timer_enabled: true,
+                ram_enabled: true,
+                save_enabled: true,
+                ..Default::default()
+            },
+            0x11 => CartridgeType {
+                mapper: Mapper::Mbc3,
+                ..Default::default()
+            },
+            0x12 => CartridgeType {
+                mapper: Mapper::Mbc3,
+                ram_enabled: true,
+                ..Default::default()
+            },
+            0x13 => CartridgeType {
+                mapper: Mapper::Mbc3,
+                ram_enabled: true,
+                save_enabled: true,
+                ..Default::default()
+            },
+            _ => panic!("Cartridge type ${:02X} not yet supported", value)
+        }
+    }
+}
+
 impl Display for CartridgeType {
     fn fmt(&self, f: &mut Formatter) -> Result {
+        try!(write!(f, "{}", self.mapper));
+
+        if self.timer_enabled {
+            try!(write!(f, " + TIMER"));
+        }
+
+        if self.ram_enabled {
+            try!(write!(f, " + RAM"));
+        }
+
+        if self.save_enabled {
+            try!(write!(f, " + BATT"));
+        }
+
+        Ok(())
+    }
+}
+
+impl Default for Mapper {
+    fn default() -> Mapper {
+        Mapper::RomOnly
+    }
+}
+
+impl Display for Mapper {
+    fn fmt(&self, f: &mut Formatter) -> Result {
         write!(f, "{}", match *self {
-            CartridgeType::RomOnly => "ROM Only",
-            CartridgeType::Mbc1 => "MBC1",
-            CartridgeType::Mbc3 => "MBC3"
+            Mapper::RomOnly => "ROM Only",
+            Mapper::Mbc1 => "MBC1",
+            Mapper::Mbc3 => "MBC3"
         })
     }
 }
