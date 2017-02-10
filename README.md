@@ -6,11 +6,11 @@ Yet Another Rust Game Boy Emulator
 * All graphics functionality working (barring bugs/glitches)
 * All audio functionality working (barring bugs/glitches)
 * Support for MBC1 and MBC3 cartridge types (though not for real time clock)
+* 'Battery-backed RAM' (i.e. save files on disk)
 
 ## Features Still To Come
 
 * Other cartridge types (and MBC3 real time clock)
-* 'Battery-backed RAM' (i.e. save files on disk)
 * Game Boy Color support (maybe)
 
 ## What Probably Won't Be Implemented
