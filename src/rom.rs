@@ -1,7 +1,9 @@
 use memory::Byte;
+use memmap::{Mmap, Protection};
 use std::fmt::{Display, Formatter, Result};
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::Read;
+use std::ops::{Index, IndexMut};
 use std::path::Path;
 
 const ROM_BANK_SIZE: usize = 0x4000;
@@ -14,7 +16,7 @@ pub struct Rom {
     rom_bank: Byte,
     rom_bank_mask: Byte,
     rom_offset: usize,
-    ram: Vec<Byte>,
+    ram: Ram,
     ram_enabled: bool,
     ram_bank: Byte,
     ram_offset: usize
@@ -24,7 +26,7 @@ pub struct Rom {
 struct CartridgeType {
     mapper: Mapper,
     timer_enabled: bool, // Note: Not currently used
-    ram_enabled: bool, // Note: Not currently used
+    ram_enabled: bool,
     save_enabled: bool
 }
 
@@ -37,6 +39,12 @@ enum Mapper {
 enum Mode {
     Rom,
     Ram
+}
+
+type Ram = Box<IndexMut<usize, Output=Byte>>;
+
+struct SaveFile {
+    data: Mmap
 }
 
 impl Rom {
@@ -79,6 +87,12 @@ impl Rom {
 
         info!("RAM size: {}", ram_size);
 
+        let ram: Ram = if cartridge_type.save_enabled {
+            Box::new(SaveFile::new(path, ram_size))
+        } else {
+            Box::new(vec![0x00; ram_size])
+        };
+
         Rom {
             data: data,
             cartridge_type: cartridge_type,
@@ -86,7 +100,7 @@ impl Rom {
             rom_bank: 0,
             rom_bank_mask: rom_bank_count - 1,
             rom_offset: ROM_BANK_SIZE,
-            ram: vec![0x00; ram_size],
+            ram: ram,
             ram_enabled: false,
             ram_bank: 0,
             ram_offset: 0
@@ -111,7 +125,7 @@ impl Rom {
         match offset {
             0x0000 ... 0x1FFF => {
                 // Enable/disable RAM (if there is any)
-                if self.ram.len() > 0 {
+                if self.cartridge_type.ram_enabled {
                     self.ram_enabled = (value & 0x0A) != 0;
                 }
             },
@@ -318,5 +332,42 @@ impl Display for Mapper {
             Mapper::Mbc1 => "MBC1",
             Mapper::Mbc3 => "MBC3"
         })
+    }
+}
+
+impl SaveFile {
+    fn new(path: &Path, size: usize) -> SaveFile {
+        let save_path = path.with_extension("sav");
+
+        let save_file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(save_path)
+            .unwrap();
+
+        save_file.set_len(size as u64).unwrap();
+
+        let data = Mmap::open_with_offset(&save_file, Protection::ReadWrite, 0, size).unwrap();
+        
+        SaveFile {
+            data: data
+        }
+    }
+}
+
+impl Index<usize> for SaveFile {
+    type Output = Byte;
+
+    fn index<'a>(&'a self, offset: usize) -> &'a Byte {
+        let data = unsafe { self.data.as_slice() };
+        &data[offset]
+    }
+}
+
+impl IndexMut<usize> for SaveFile {
+    fn index_mut<'a>(&'a mut self, offset: usize) -> &'a mut Byte {
+        let data = unsafe { self.data.as_mut_slice() };
+        &mut data[offset]
     }
 }

@@ -6,6 +6,7 @@ extern crate bitflags;
 extern crate log;
 
 extern crate getopts;
+extern crate memmap;
 extern crate sdl2;
 extern crate time;
 

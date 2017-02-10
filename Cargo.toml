@@ -8,6 +8,7 @@ authors = ["James Lippitt <james.lippitt@wjweb.co.uk>"]
 bitflags = "0.5"
 getopts = "0.2"
 log = "0.3"
+memmap = "0.5"
 sdl2 = "0.16"
 time = "0.1"
 
