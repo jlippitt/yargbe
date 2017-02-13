@@ -37,10 +37,12 @@ impl Screen {
             .build()
             .unwrap();
 
-        let renderer = window.renderer()
+        let mut renderer = window.renderer()
             .accelerated()
             .build()
             .unwrap();
+
+        renderer.clear();
 
         let texture = renderer.create_texture(
             PixelFormatEnum::ARGB8888,
