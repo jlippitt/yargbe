@@ -46,7 +46,7 @@ impl SpriteTable {
         let mut sprite_refs: Vec<&Sprite> = self.sprites.iter()
             .filter(|sprite| {
                 let adjusted_line = line + Y_ADJUST_AMOUNT;
-                adjusted_line > sprite.y_pos && adjusted_line < sprite.y_pos.wrapping_add(height)
+                adjusted_line >= sprite.y_pos && adjusted_line < sprite.y_pos.wrapping_add(height)
             })
             .take(MAX_SPRITES_PER_LINE)
             .collect();
