@@ -61,8 +61,8 @@ impl Joypad {
             Keycode::Right => joypad_state.dpad.remove(DPAD_RIGHT),
             Keycode::Return => joypad_state.button.remove(BUTTON_START),
             Keycode::Space => joypad_state.button.remove(BUTTON_SELECT),
-            Keycode::X => joypad_state.button.remove(BUTTON_B),
-            Keycode::Z => joypad_state.button.remove(BUTTON_A),
+            Keycode::Z => joypad_state.button.remove(BUTTON_B),
+            Keycode::X => joypad_state.button.remove(BUTTON_A),
             // Skip the interrupt if unrecognised key
             _ => return
         }
@@ -80,8 +80,8 @@ impl Joypad {
             Keycode::Right => joypad_state.dpad.insert(DPAD_RIGHT),
             Keycode::Return => joypad_state.button.insert(BUTTON_START),
             Keycode::Space => joypad_state.button.insert(BUTTON_SELECT),
-            Keycode::X => joypad_state.button.insert(BUTTON_B),
-            Keycode::Z => joypad_state.button.insert(BUTTON_A),
+            Keycode::Z => joypad_state.button.insert(BUTTON_B),
+            Keycode::X => joypad_state.button.insert(BUTTON_A),
             // Skip the interrupt if unrecognised key
             _ => return
         }
