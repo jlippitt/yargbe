@@ -4,6 +4,9 @@ use std::vec::IntoIter;
 const TABLE_SIZE: usize = 40;
 const MAX_SPRITES_PER_LINE: usize = 10;
 
+const X_ADJUST_AMOUNT: Byte = 8;
+const Y_ADJUST_AMOUNT: Byte = 16;
+
 pub struct SpriteTable {
     sprites: [Sprite; TABLE_SIZE]
 }
@@ -41,7 +44,8 @@ impl SpriteTable {
     pub fn iter_for_line<'a>(&'a self, line: Byte, height: Byte) -> IntoIter<&'a Sprite> {
         let mut sprite_refs: Vec<&Sprite> = self.sprites.iter()
             .filter(|sprite| {
-                line >= sprite.y() && line < sprite.y().wrapping_add(height)
+                let adjusted_line = line + Y_ADJUST_AMOUNT;
+                adjusted_line > sprite.y_pos && adjusted_line < sprite.y_pos.wrapping_add(height)
             })
             .take(MAX_SPRITES_PER_LINE)
             .collect();
@@ -54,11 +58,11 @@ impl SpriteTable {
 
 impl Sprite {
     pub fn x(&self) -> Byte {
-        self.x_pos.wrapping_sub(8)
+        self.x_pos.wrapping_sub(X_ADJUST_AMOUNT)
     }
 
     pub fn y(&self) -> Byte {
-        self.y_pos.wrapping_sub(16)
+        self.y_pos.wrapping_sub(Y_ADJUST_AMOUNT)
     }
 
     pub fn tile(&self) -> Byte {
