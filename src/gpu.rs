@@ -111,7 +111,7 @@ impl Gpu {
                 let line_y = self.next_line();
 
                 if line_y == DISPLAY_HEIGHT {
-                    self.screen.update();
+                    self.screen.end_frame();
                     self.set_mode(GpuMode::VBlank);
                     self.interrupt_state.borrow_mut().fire(Interrupt::VBlank);
                 } else {
@@ -123,6 +123,7 @@ impl Gpu {
 
                 if line_y == 0 {
                     self.set_mode(GpuMode::Oam);
+                    self.screen.begin_frame();
                 }
             }
         };
@@ -190,7 +191,7 @@ impl Gpu {
             return;
         }
 
-        self.screen.set_line(line_y as usize);
+        self.screen.set_row(line_y as usize);
 
         // We need to determine if the background or window has draw to a
         // particular pixel so that we can draw low priority sprites behind
@@ -291,11 +292,14 @@ impl Gpu {
                     SpritePalette::Palette1 => gpu_state.obj_palette1
                 };
 
+                self.screen.set_column(sprite.x() as usize);
+
                 for pos_x in 0..tile_size {
                     let line_x = sprite.x().wrapping_add(pos_x);
 
                     // Don't draw the pixel if it's not on the screen
                     if line_x >= DISPLAY_WIDTH {
+                        self.screen.skip_pixel();
                         continue;
                     }
 
@@ -303,6 +307,7 @@ impl Gpu {
                     // background layer (including window) has draw something
                     // other than colour 0 onto this pixel.
                     if sprite.low_priority() && self.pixel_active[line_x as usize] {
+                        self.screen.skip_pixel();
                         continue;
                     }
 
@@ -318,14 +323,11 @@ impl Gpu {
 
                     if colour_index == 0 {
                         // Pixel is transparent
+                        self.screen.skip_pixel();
                         continue;
                     }
 
-                    self.screen.draw_pixel(
-                        line_x as usize,
-                        palette,
-                        colour_index
-                    );
+                    self.screen.draw_pixel(palette, colour_index);
                 }
             }
         }
@@ -361,6 +363,8 @@ impl Gpu {
         let mut tile_id = tile_map.get(index_x, index_y);
         let mut tile = tile_data.get(tile_id, tile_data_region);
 
+        self.screen.set_column(start_x as usize);
+
         for line_x in start_x..DISPLAY_WIDTH {
             let colour_index = tile.get(offset_x, offset_y);
 
@@ -370,11 +374,7 @@ impl Gpu {
                 self.pixel_active[line_x as usize] = true;
             }
 
-            self.screen.draw_pixel(
-                line_x as usize,
-                gpu_state.bg_palette,
-                colour_index
-            );
+            self.screen.draw_pixel(gpu_state.bg_palette, colour_index);
 
             offset_x += 1;
 

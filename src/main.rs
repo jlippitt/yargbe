@@ -8,6 +8,7 @@ extern crate log;
 extern crate getopts;
 extern crate memmap;
 extern crate sdl2;
+extern crate sdl2_sys;
 extern crate time;
 
 #[macro_use]
