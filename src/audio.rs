@@ -716,7 +716,7 @@ impl FrequencySweep {
         self.clock = 0;
         self.enabled = self.period != 0 || self.shift != 0;
 
-        if self.enabled {
+        if self.shift != 0 {
             self.sweep(frequency_timer)
         } else {
             false
