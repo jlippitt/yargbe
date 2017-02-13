@@ -1,4 +1,5 @@
 use memory::Byte;
+use std::cmp;
 use std::vec::IntoIter;
 
 const TABLE_SIZE: usize = 40;
@@ -50,7 +51,7 @@ impl SpriteTable {
             .take(MAX_SPRITES_PER_LINE)
             .collect();
 
-        sprite_refs.sort_by_key(|sprite| sprite.x());
+        sprite_refs.sort_by_key(|sprite| sprite.x_pos);
 
         sprite_refs.into_iter()
     }
@@ -59,6 +60,10 @@ impl SpriteTable {
 impl Sprite {
     pub fn x(&self) -> Byte {
         self.x_pos.wrapping_sub(X_ADJUST_AMOUNT)
+    }
+
+    pub fn start_x(&self) -> Byte {
+        X_ADJUST_AMOUNT.wrapping_sub(cmp::min(self.x_pos, X_ADJUST_AMOUNT))
     }
 
     pub fn y(&self) -> Byte {

@@ -292,9 +292,15 @@ impl Gpu {
                     SpritePalette::Palette1 => gpu_state.obj_palette1
                 };
 
-                self.screen.set_column(sprite.x() as usize);
+                let start_x = sprite.start_x();
 
-                for pos_x in 0..tile_size {
+                if start_x == 0 {
+                    self.screen.set_column(sprite.x() as usize);
+                } else {
+                    self.screen.set_column(0);
+                }
+
+                for pos_x in start_x..tile_size {
                     let line_x = sprite.x().wrapping_add(pos_x);
 
                     // Don't draw the pixel if it's not on the screen
