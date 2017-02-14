@@ -308,6 +308,14 @@ impl AudioState {
             },
             0x26 => {
                 self.enabled = (value & 0x80) != 0;
+
+                if !self.enabled {
+                    // Disabling the audio system will essentially write 0 to all other registers
+                    // Note: Last entry in range below is exclusive!
+                    for register in 0x10..0x26 {
+                        self.put_byte(register, 0);
+                    }
+                }
             },
             0x30 ... 0x3F => {
                 self.wave.wave_ram.ram[offset - 0x30] = value;
