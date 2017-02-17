@@ -952,6 +952,7 @@ impl Envelope {
     
     fn set_bits(&mut self, value: Byte) {
         self.starting_volume = (value & 0xF0) >> 4;
+        self.current_volume = self.starting_volume;
         self.add = (value & 0x08) != 0;
         self.period = value & 0x07;
     }
