@@ -917,7 +917,9 @@ impl LengthCounter {
     }
 
     fn reset(&mut self) {
-        self.counter = self.max_value;
+        if self.counter == 0 {
+            self.counter = self.max_value;
+        }
     }
 
     fn on_frame_update(&mut self, frame: Frame) -> bool {
