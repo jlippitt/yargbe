@@ -1,5 +1,5 @@
 use memory::Byte;
-use sdl2::pixels::PixelFormatEnum;
+use sdl2::pixels::{Color, PixelFormatEnum};
 use sdl2::rect::Rect;
 use sdl2::render::{Renderer, Texture, TextureAccess};
 use sdl2::VideoSubsystem;
@@ -42,6 +42,7 @@ impl Screen {
             .build()
             .unwrap();
 
+        renderer.set_draw_color(Color::RGB(0xFF, 0xFF, 0xFF));
         renderer.clear();
 
         let texture = renderer.create_texture(
