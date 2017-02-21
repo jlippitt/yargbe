@@ -297,8 +297,8 @@ impl Gpu {
             // sprites further right
             for sprite in sprite_table.iter_for_line(line_y, sprite_height).rev() {
                 let offset_y = match sprite.flip_y() {
-                    false => line_y - sprite.y(),
-                    true => (sprite_height - 1) - (line_y - sprite.y())
+                    false => line_y.wrapping_sub(sprite.y()),
+                    true => (sprite_height - 1) - (line_y.wrapping_sub(sprite.y()))
                 };
 
                 let tile_id = match control.contains(SPRITE_SIZE) {
