@@ -16,6 +16,7 @@ pub struct Gpu {
     screen: Screen,
     gpu_state: Rc<RefCell<GpuState>>,
     interrupt_state: Rc<RefCell<InterruptState>>,
+    lcd_on: bool,
     mode: GpuMode,
     mode_clock: u64,
     pixel_active: [bool; DISPLAY_WIDTH as usize]
@@ -82,6 +83,7 @@ impl Gpu {
             screen: screen,
             gpu_state: gpu_state,
             interrupt_state: interrupt_state,
+            lcd_on: false,
             mode: GpuMode::HBlank,
             mode_clock: 0,
             pixel_active: [false; DISPLAY_WIDTH as usize]
@@ -89,6 +91,33 @@ impl Gpu {
     }
 
     pub fn step(&mut self, delta: u64) {
+        let control = self.gpu_state.borrow().control;
+
+        // Switch screen on/off (if necessary) according to register value
+        if self.lcd_on {
+            if !control.contains(MASTER_DISPLAY) {
+                // Blank the whole screen until it gets switched on again
+                self.screen.clear();
+                self.lcd_on = false;
+                debug!("Screen OFF");
+            }
+        } else {
+            if control.contains(MASTER_DISPLAY) {
+                // Reset the mode clock (to prevent errors)
+                self.mode = GpuMode::HBlank;
+                self.mode_clock = 0;
+                self.gpu_state.borrow_mut().line_y = 0;
+                self.screen.begin_frame();
+                self.lcd_on = true;
+                debug!("Screen ON");
+            }
+        }
+
+        // If the screen is on, update the internal clock
+        if !self.lcd_on {
+            return;
+        }
+
         self.mode_clock += delta;
 
         if self.mode_clock < self.mode.duration() {

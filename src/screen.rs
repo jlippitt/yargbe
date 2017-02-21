@@ -60,6 +60,11 @@ impl Screen {
             row_length: 0
         }
     }
+
+    pub fn clear(&mut self) {
+        self.renderer.clear();
+        self.renderer.present();
+    }
     
     pub fn begin_frame(&mut self) {
         self.renderer.clear();
